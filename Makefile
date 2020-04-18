@@ -9,24 +9,37 @@ CURRENT_DIR := $(shell pwd)
 build:
 	docker run --rm -v $(CURRENT_DIR)/app:/app -w /app nrf5_build make
 
-flash_app:
-	docker run --rm -v $(CURRENT_DIR)/app:/app -w /app openocd \
+flash_all:
+	docker run --privileged --rm -v $(CURRENT_DIR)/softdevice:/softdevice -v $(CURRENT_DIR)/app:/app -w /app openocd \
+		openocd \
 		-f openocd.cfg \
 		-c init \
 		-c "reset init" \
 		-c halt \
 		-c "nrf5 mass_erase" \
+		-c "program /softdevice/s132.hex verify" \
+		-c "program /app/_build/nrf52832_xxaa.hex verify" \
+		-c reset \
+		-c exit
+
+flash_app:
+	docker run --privileged --rm -v $(CURRENT_DIR)/app:/app -w /app openocd \
+		openocd \
+		-f openocd.cfg \
+		-c init \
+		-c "reset init" \
+		-c halt \
 		-c "program /app/_build/nrf52832_xxaa.hex verify" \
 		-c reset \
 		-c exit
 
 flash_softdevice: softdevice/s132.hex
-	docker run --rm -v $(CURRENT_DIR)/softdevice:/softdevice -w /app openocd \
+	docker run --privileged --rm -v $(CURRENT_DIR)/softdevice:/softdevice -w /app openocd \
+		openocd \
 		-f openocd.cfg \
 		-c init \
 		-c "reset init" \
 		-c halt \
-		-c "nrf5 mass_erase" \
 		-c "program /softdevice/s132.hex verify" \
 		-c reset \
 		-c exit
