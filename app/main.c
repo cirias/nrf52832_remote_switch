@@ -70,6 +70,8 @@
 
 
 #define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
+/* #define CONNECTED_LED                   BSP_BOARD_LED_0                         [>*< Is on when device has connected. <] */
+#define LEDBUTTON_LED                   BSP_BOARD_LED_1                         /**< LED to be toggled with the help of the LED Button Service. */
 #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
 #define DEVICE_NAME                     "Nordic_Blinky"                         /**< Name of device. Will be included in the advertising data. */
@@ -269,12 +271,12 @@ static void led_write_handler(uint16_t conn_handle, ble_lbs_t * p_lbs, uint8_t l
 {
     if (led_state)
     {
-        /* bsp_board_led_on(LEDBUTTON_LED); */
+        bsp_board_led_on(LEDBUTTON_LED);
         NRF_LOG_INFO("Received LED ON!");
     }
     else
     {
-        /* bsp_board_led_off(LEDBUTTON_LED); */
+        bsp_board_led_off(LEDBUTTON_LED);
         NRF_LOG_INFO("Received LED OFF!");
     }
 }
