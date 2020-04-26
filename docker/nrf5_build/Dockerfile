@@ -20,4 +20,4 @@ RUN apt-get install -y make
 
 RUN make -C /opt/nrf5_sdk/examples/peripheral/blinky/pca10059/mbr/armgcc/
 
-RUN apt-get install -y gdb
+RUN apt-get install -y gdb-arm-none-eabi

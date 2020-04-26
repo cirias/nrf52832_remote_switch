@@ -9,6 +9,14 @@ CURRENT_DIR := $(shell pwd)
 build:
 	docker run --rm -v $(CURRENT_DIR)/app:/app -w /app nrf5_build make
 
+gdb:
+	docker run -it --privileged --net=host --rm -v $(CURRENT_DIR)/softdevice:/softdevice -v $(CURRENT_DIR)/app:/app -w /app nrf5_build \
+		gdb-multiarch -q -x openocd.gdb /app/_build/nrf52832_xxaa.out
+
+openocd:
+	docker run -it --privileged --net=host --rm -v $(CURRENT_DIR)/softdevice:/softdevice -v $(CURRENT_DIR)/app:/app -w /app openocd \
+		openocd
+
 flash_all:
 	docker run --privileged --rm -v $(CURRENT_DIR)/softdevice:/softdevice -v $(CURRENT_DIR)/app:/app -w /app openocd \
 		openocd \
