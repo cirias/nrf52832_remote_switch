@@ -4,6 +4,7 @@ OUT_DIR := $(CURRENT_DIR)/app/_build
 
 SRC_FILES += \
 	$(SRC_DIR)/nrf52.ld \
+	$(SRC_DIR)/config/sdk_config.h \
 	$(SRC_DIR)/custom_board.h \
 	$(SRC_DIR)/ble_cus.h \
 	$(SRC_DIR)/ble_cus.c \
