@@ -32,6 +32,14 @@ NRF_SDH_BLE_OBSERVER(_name ## _obs,                                            \
 #define CUSTOM_SERVICE_UUID       0x1400
 #define CUSTOM_VALUE_CHAR_UUID    0x1401
 
+
+#define MOTOR_A  0x10
+#define MOTOR_B  0x20
+
+#define MOTOR_OP_FORWARD  0x01
+#define MOTOR_OP_BACKWARD  0x02
+
+
 // Forward declaration of the ble_cus_t type.
 typedef struct ble_cus_s ble_cus_t;
 

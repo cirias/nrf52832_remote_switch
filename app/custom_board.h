@@ -39,6 +39,13 @@ extern "C" {
 
 // #define HWFC           true
 
+#define MOTOR_A_IN1    6
+#define MOTOR_A_IN2    7
+#define MOTOR_A_PWM    8
+#define MOTOR_B_IN1    11
+#define MOTOR_B_IN2    12
+#define MOTOR_B_PWM    13
+
 #ifdef __cplusplus
 }
 #endif

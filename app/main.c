@@ -59,7 +59,6 @@
 #include "boards.h"
 #include "app_timer.h"
 #include "app_button.h"
-#include "ble_cus.h"
 #include "nrf_ble_gatt.h"
 #include "nrf_ble_qwr.h"
 #include "nrf_pwr_mgmt.h"
@@ -67,6 +66,9 @@
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
+
+#include "ble_cus.h"
+#include "motors.h"
 
 
 #define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
@@ -101,6 +103,13 @@ BLE_CUS_DEF(m_cus);                                                             
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 
+MOTOR_DEF(m_motor_a);
+MOTOR_DEF(m_motor_b);
+
+APP_TIMER_DEF(m_motor_execute_timer_id);
+APP_TIMER_DEF(m_motor_recover_timer_id);
+
+
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        /**< Handle of the current connection. */
 
 static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
@@ -119,9 +128,17 @@ static ble_gap_adv_data_t m_adv_data =
     {
         .p_data = m_enc_scan_response_data,
         .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
-
     }
 };
+
+#define WHITELIST_LEN 1
+static const ble_gap_addr_t m_ble_addr_x1c7 =
+{
+  .addr_id_peer = 1,
+  .addr_type    = BLE_GAP_ADDR_TYPE_PUBLIC,
+  .addr         = BLE_ADDR_X1C7
+};
+static ble_gap_addr_t const* m_whitelist[WHITELIST_LEN] = {&m_ble_addr_x1c7};
 
 
 /**@brief Function for assert macro callback.
@@ -141,16 +158,6 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
 }
 
 
-/**@brief Function for the LEDs initialization.
- *
- * @details Initializes all LEDs used by the application.
- */
-static void leds_init(void)
-{
-    bsp_board_init(BSP_INIT_LEDS);
-}
-
-
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module.
@@ -160,6 +167,16 @@ static void timers_init(void)
     // Initialize timer module, making it use the scheduler
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
+}
+
+
+/**@brief Function for the LEDs initialization.
+ *
+ * @details Initializes all LEDs used by the application.
+ */
+static void leds_init(void)
+{
+    bsp_board_init(BSP_INIT_LEDS);
 }
 
 
@@ -220,18 +237,99 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
  * @param[in] p_cus     Instance of LED Button Service to which the write applies.
  * @param[in] led_state Written/desired state of the LED.
  */
-static void led_write_handler(uint16_t conn_handle, ble_cus_t * p_cus, uint8_t led_state)
+/*
+ * static void led_write_handler(uint16_t conn_handle, ble_cus_t * p_cus, uint8_t led_state)
+ * {
+ *     if (led_state)
+ *     {
+ *         bsp_board_led_on(LEDBUTTON_LED);
+ *         NRF_LOG_INFO("Received LED ON!");
+ *     }
+ *     else
+ *     {
+ *         bsp_board_led_off(LEDBUTTON_LED);
+ *         NRF_LOG_INFO("Received LED OFF!");
+ *     }
+ * }
+ */
+
+
+static void motor_execute(uint8_t motor_op)
 {
-    if (led_state)
+    motor_t * p_motor;
+    uint32_t  duration;
+    
+    if ((motor_op & MOTOR_A) == MOTOR_A)
     {
-        bsp_board_led_on(LEDBUTTON_LED);
-        NRF_LOG_INFO("Received LED ON!");
+        p_motor = &m_motor_a;
+        duration = APP_TIMER_TICKS(210);
     }
     else
     {
-        bsp_board_led_off(LEDBUTTON_LED);
-        NRF_LOG_INFO("Received LED OFF!");
+        p_motor = &m_motor_b;
+        duration = APP_TIMER_TICKS(170);
     }
+
+    motor_enable(p_motor);
+
+    if ((motor_op & MOTOR_OP_FORWARD) == MOTOR_OP_FORWARD)
+    {
+        motor_forward(p_motor);
+    }
+    else
+    {
+        motor_backward(p_motor);
+    }
+
+    app_timer_start(m_motor_execute_timer_id, duration, (void *)(uint32_t)motor_op);
+}
+
+
+static void motor_recover(uint8_t motor_op)
+{
+    motor_t * p_motor;
+    uint32_t  duration;
+    
+    if ((motor_op & MOTOR_A) == MOTOR_A)
+    {
+        p_motor = &m_motor_a;
+        duration = APP_TIMER_TICKS(80);
+    }
+    else
+    {
+        p_motor = &m_motor_b;
+        duration = APP_TIMER_TICKS(60);
+    }
+
+    if ((motor_op & MOTOR_OP_FORWARD) == MOTOR_OP_FORWARD)
+    {
+        motor_backward(p_motor);
+    }
+    else
+    {
+        motor_forward(p_motor);
+    }
+
+    app_timer_start(m_motor_recover_timer_id, duration, NULL);
+}
+
+
+static void motor_execute_timeout_handler(void * p_context)
+{
+    motor_recover((uint8_t)(uint32_t)p_context);
+}
+
+
+static void motor_recover_timeout_handler(void * p_context)
+{
+    motor_disable(&m_motor_a);
+    motor_disable(&m_motor_b);
+}
+
+
+static void motor_write_handler(uint16_t conn_handle, ble_cus_t * p_cus, uint8_t motor_op)
+{
+    motor_execute(motor_op);
 }
 
 
@@ -243,6 +341,18 @@ static void services_init(void)
     ble_cus_init_t     init     = {0};
     nrf_ble_qwr_init_t qwr_init = {0};
 
+    // Create timers
+    err_code = app_timer_create(&m_motor_execute_timer_id,
+                                APP_TIMER_MODE_SINGLE_SHOT,
+                                motor_execute_timeout_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = app_timer_create(&m_motor_recover_timer_id,
+                                APP_TIMER_MODE_SINGLE_SHOT,
+                                motor_recover_timeout_handler);
+    APP_ERROR_CHECK(err_code);
+
+
     // Initialize Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
 
@@ -250,7 +360,8 @@ static void services_init(void)
     APP_ERROR_CHECK(err_code);
 
     // Initialize CUS.
-    init.evt_handler = led_write_handler;
+    /* init.evt_handler = led_write_handler; */
+    init.evt_handler = motor_write_handler;
 
     err_code = ble_cus_init(&m_cus, &init);
     APP_ERROR_CHECK(err_code);
@@ -321,14 +432,22 @@ static void advertising_init(void)
     ble_advdata_t advdata;
     ble_advdata_t srdata;
 
-    ble_uuid_t adv_uuids[] = {{CUSTOM_SERVICE_UUID, m_cus.uuid_type}};
+    ble_uuid_t adv_uuids[] =
+    {
+      {CUSTOM_SERVICE_UUID,      m_cus.uuid_type},
+      {BLE_UUID_BATTERY_SERVICE, BLE_UUID_TYPE_BLE},
+    };
+
+    err_code = sd_ble_gap_whitelist_set(m_whitelist, WHITELIST_LEN);
+    APP_ERROR_CHECK(err_code);
 
     // Build and set advertising data.
     memset(&advdata, 0, sizeof(advdata));
 
     advdata.name_type          = BLE_ADVDATA_FULL_NAME;
     advdata.include_appearance = true;
-    advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
+    /* advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE; */
+    advdata.flags              = BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED; // whitelist depends
 
     memset(&srdata, 0, sizeof(srdata));
     srdata.uuids_complete.uuid_cnt = sizeof(adv_uuids) / sizeof(adv_uuids[0]);
@@ -349,7 +468,8 @@ static void advertising_init(void)
     adv_params.duration        = APP_ADV_DURATION;
     adv_params.properties.type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
     adv_params.p_peer_addr     = NULL;
-    adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
+    /* adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY; */
+    adv_params.filter_policy   = BLE_GAP_ADV_FP_FILTER_CONNREQ; // use whitelist to filter connection request
     adv_params.interval        = APP_ADV_INTERVAL;
 
     err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
@@ -513,6 +633,24 @@ static void idle_state_handle(void)
 }
 
 
+static void motors_init(void)
+{
+    motor_init_t init = {0, 0, 0};
+
+    init.in1 = MOTOR_A_IN1;
+    init.in2 = MOTOR_A_IN2;
+    init.pwm = MOTOR_A_PWM;
+
+    motor_init(&m_motor_a, &init);
+
+    init.in1 = MOTOR_B_IN1;
+    init.in2 = MOTOR_B_IN2;
+    init.pwm = MOTOR_B_PWM;
+
+    motor_init(&m_motor_b, &init);
+}
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -521,6 +659,7 @@ int main(void)
     log_init();
     timers_init();
     leds_init();
+    motors_init();
     /* buttons_init(); */
     power_management_init();
     ble_stack_init();
