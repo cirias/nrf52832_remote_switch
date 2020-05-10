@@ -53,6 +53,7 @@
 #include "ble_hci.h"
 #include "ble_srv_common.h"
 #include "ble_advdata.h"
+#include "ble_bas.h"
 #include "ble_conn_params.h"
 #include "nrf_sdh.h"
 #include "nrf_sdh_ble.h"
@@ -100,6 +101,7 @@
 
 
 BLE_CUS_DEF(m_cus);                                                             /**< LED Button Service instance. */
+BLE_BAS_DEF(m_bas);                                                             /**< Structure used to identify the battery service. */
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
 NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
 
@@ -339,6 +341,7 @@ static void services_init(void)
 {
     ret_code_t         err_code;
     ble_cus_init_t     init     = {0};
+    ble_bas_init_t     bas_init;
     nrf_ble_qwr_init_t qwr_init = {0};
 
     // Create timers
@@ -364,6 +367,22 @@ static void services_init(void)
     init.evt_handler = motor_write_handler;
 
     err_code = ble_cus_init(&m_cus, &init);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialize Battery Service.
+    memset(&bas_init, 0, sizeof(bas_init));
+
+    bas_init.evt_handler          = NULL;
+    bas_init.support_notification = true;
+    bas_init.p_report_ref         = NULL;
+    bas_init.initial_batt_level   = 100;
+
+    // Here the sec level for the Battery Service can be changed/increased.
+    bas_init.bl_rd_sec        = SEC_OPEN;
+    bas_init.bl_cccd_wr_sec   = SEC_OPEN;
+    bas_init.bl_report_rd_sec = SEC_OPEN;
+
+    err_code = ble_bas_init(&m_bas, &bas_init);
     APP_ERROR_CHECK(err_code);
 }
 
