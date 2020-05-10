@@ -133,14 +133,16 @@ static ble_gap_adv_data_t m_adv_data =
     }
 };
 
-#define WHITELIST_LEN 1
-static const ble_gap_addr_t m_ble_addr_x1c7 =
-{
-  .addr_id_peer = 1,
-  .addr_type    = BLE_GAP_ADDR_TYPE_PUBLIC,
-  .addr         = BLE_ADDR_X1C7
-};
-static ble_gap_addr_t const* m_whitelist[WHITELIST_LEN] = {&m_ble_addr_x1c7};
+/*
+ * #define WHITELIST_LEN 1
+ * static const ble_gap_addr_t m_ble_addr_x1c7 =
+ * {
+ *   .addr_id_peer = 1,
+ *   .addr_type    = BLE_GAP_ADDR_TYPE_PUBLIC,
+ *   .addr         = BLE_ADDR_X1C7
+ * };
+ * static ble_gap_addr_t const* m_whitelist[WHITELIST_LEN] = {&m_ble_addr_x1c7};
+ */
 
 
 /**@brief Function for assert macro callback.
@@ -457,16 +459,18 @@ static void advertising_init(void)
       {BLE_UUID_BATTERY_SERVICE, BLE_UUID_TYPE_BLE},
     };
 
-    err_code = sd_ble_gap_whitelist_set(m_whitelist, WHITELIST_LEN);
-    APP_ERROR_CHECK(err_code);
+    /*
+     * err_code = sd_ble_gap_whitelist_set(m_whitelist, WHITELIST_LEN);
+     * APP_ERROR_CHECK(err_code);
+     */
 
     // Build and set advertising data.
     memset(&advdata, 0, sizeof(advdata));
 
     advdata.name_type          = BLE_ADVDATA_FULL_NAME;
     advdata.include_appearance = true;
-    /* advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE; */
-    advdata.flags              = BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED; // whitelist depends
+    advdata.flags              = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
+    /* advdata.flags              = BLE_GAP_ADV_FLAG_BR_EDR_NOT_SUPPORTED; // whitelist depends */
 
     memset(&srdata, 0, sizeof(srdata));
     srdata.uuids_complete.uuid_cnt = sizeof(adv_uuids) / sizeof(adv_uuids[0]);
@@ -487,8 +491,8 @@ static void advertising_init(void)
     adv_params.duration        = APP_ADV_DURATION;
     adv_params.properties.type = BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED;
     adv_params.p_peer_addr     = NULL;
-    /* adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY; */
-    adv_params.filter_policy   = BLE_GAP_ADV_FP_FILTER_CONNREQ; // use whitelist to filter connection request
+    adv_params.filter_policy   = BLE_GAP_ADV_FP_ANY;
+    /* adv_params.filter_policy   = BLE_GAP_ADV_FP_FILTER_CONNREQ; // use whitelist to filter connection request */
     adv_params.interval        = APP_ADV_INTERVAL;
 
     err_code = sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, &adv_params);
