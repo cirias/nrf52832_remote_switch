@@ -1,12 +1,46 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+pub struct ResponseBody<T> {
+    pub ok: bool,
+    pub description: Option<String>,
+    pub result: Option<T>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct GetUpdatesParams {
     offset:	i64,	// Optional	Identifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates. By default, updates starting with the earliest unconfirmed update are returned. An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id. The negative offset can be specified to retrieve updates starting from -offset update from the end of the updates queue. All previous updates will forgotten.
     limit:	i64,	// Optional	Limits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.
     timeout:	i64,	// Optional	Timeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.
     allowed_updates:	Vec<String>, // Optional	A JSON-serialized list of the update types you want your bot to receive. For example, specify [“message”, “edited_channel_post”, “callback_query”] to only receive updates of these types. See Update for a complete list of available update types. Specify an empty list to receive all updates regardless of type (default). If not specified, the previous setting will be used.
     // Please note that this parameter doesn't affect updates created before the call to the getUpdates, so unwanted updates may be received for a short period of time.
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SendMessageParams {
+    chat_id: i64,	// Required. Unique identifier for the target chat or username of the target channel (in the format @channelusername)
+    text:	String,	// Required. Text of the message to be sent, 1-4096 characters after entities parsing
+    parse_mode:	String,	// Optional	Mode for parsing entities in the message text. See formatting options for more details.
+    disable_web_page_preview:	bool,	// Optional	Disables link previews for links in this message
+    disable_notification:	bool,	// Optional	Sends the message silently. Users will receive a notification with no sound.
+    reply_to_message_id:	i64,	// Optional	If the message is a reply, ID of the original message
+    reply_markup:	ReplyKeyboardMarkup, // InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply,	// Optional	Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ReplyKeyboardMarkup {
+    keyboard: Vec<Vec<KeyboardButton>>,	// Array of button rows, each represented by an Array of KeyboardButton objects
+    resize_keyboard:	bool,	// Optional. Requests clients to resize the keyboard vertically for optimal fit (e.g., make the keyboard smaller if there are just two rows of buttons). Defaults to false, in which case the custom keyboard is always of the same height as the app's standard keyboard.
+    one_time_keyboard:	bool,	// Optional. Requests clients to hide the keyboard as soon as it's been used. The keyboard will still be available, but clients will automatically display the usual letter-keyboard in the chat – the user can press a special button in the input field to see the custom keyboard again. Defaults to false.
+    selective:	bool,	//Optional. Use this parameter if you want to show the keyboard to specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct KeyboardButton {
+    text:	String,	// Text of the button. If none of the optional fields are used, it will be sent as a message when the button is pressed
+    request_contact: bool,	// Optional. If True, the user's phone number will be sent as a contact when the button is pressed. Available in private chats only
+    request_location:	bool,	// Optional. If True, the user's current location will be sent when the button is pressed. Available in private chats only
+// request_poll	KeyboardButtonPollType	Optional. If specified, the user will be asked to create a poll and send it to the bot when the button is pressed. Available in private chats only
 }
 
 #[derive(Serialize, Deserialize)]

@@ -7,19 +7,32 @@ pub struct TelegramBot {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+impl<T> From<types::ResponseBody<T>> for Result<T> {
+    fn from(body: types::ResponseBody<T>) -> Result<T> {
+        if body.result.is_some() {
+            return Ok(body.result.unwrap())
+        }
+
+        Err(Error::ResponseError(body.description))
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
     RequestError(reqwest::Error),
+    ResponseError(Option<String>),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            /*
-             * DoubleError::EmptyVec =>
-             *     write!(f, "please use a vector with at least one element"),
-             */
             Error::RequestError(ref e) => e.fmt(f),
+            Error::ResponseError(ref e) => {
+                match e {
+                    Some(ref s) => write!(f, "{}", s),
+                    None => write!(f, "unknown error"),
+                }
+            }
         }
     }
 }
@@ -28,6 +41,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             Error::RequestError(ref e) => Some(e),
+            Error::ResponseError(_) => None,
         }
     }
 }
@@ -49,24 +63,36 @@ impl TelegramBot {
 
     pub async fn get_me(&self) -> Result<types::User> {
         let url = self.get_url("getMe");
-        let data = self.client.get(&url).send()
+        let body = self.client.get(&url).send()
             .await?
             .error_for_status()?
-            .json::<types::User>()
+            .json::<types::ResponseBody<types::User>>()
             .await?;
-        Ok(data)
+        body.into()
     }
 
     pub async fn get_updates(&self, params: &types::GetUpdatesParams) -> Result<Vec<types::Message>> {
         let url = self.get_url("getUpdates");
-        let data = self.client.post(&url)
+        let body = self.client.post(&url)
             .json(params)
             .send()
             .await?
             .error_for_status()?
-            .json::<Vec<types::Message>>()
+            .json::<types::ResponseBody<Vec<types::Message>>>()
             .await?;
-        Ok(data)
+        body.into()
+    }
+
+    pub async fn send_message(&self, params: &types::SendMessageParams) -> Result<types::Message> {
+        let url = self.get_url("sendMessage");
+        let body = self.client.post(&url)
+            .json(params)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<types::ResponseBody<types::Message>>()
+            .await?;
+        body.into()
     }
 
     fn get_url(&self, method: &str) -> String {
@@ -87,6 +113,7 @@ mod tests {
             Err(e) => {
                 match e {
                     Error::RequestError(e) => assert_eq!(e.status(), Some(reqwest::StatusCode::UNAUTHORIZED)),
+                    Error::ResponseError(_) => assert!(false),
                 }
             },
             Ok(_) => assert!(false),
