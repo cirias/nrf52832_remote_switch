@@ -1,4 +1,4 @@
-mod types;
+pub mod types;
 
 pub struct TelegramBot {
     client: reqwest::Client,
@@ -71,14 +71,14 @@ impl TelegramBot {
         body.into()
     }
 
-    pub async fn get_updates(&self, params: &types::GetUpdatesParams) -> Result<Vec<types::Message>> {
+    pub async fn get_updates(&self, params: &types::GetUpdatesParams) -> Result<Vec<types::Update>> {
         let url = self.get_url("getUpdates");
         let body = self.client.post(&url)
             .json(params)
             .send()
             .await?
             .error_for_status()?
-            .json::<types::ResponseBody<Vec<types::Message>>>()
+            .json::<types::ResponseBody<Vec<types::Update>>>()
             .await?;
         body.into()
     }
